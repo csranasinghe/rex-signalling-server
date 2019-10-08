@@ -1,55 +1,3 @@
-// const static = require('node-static');
-// const http = require('http');
-// const file = new (static.Server)();
-// const app = http.createServer(function (req, res) {
-//     file.serve(req, res);
-// }).listen(8888);
-
-// const io = require('socket.io').listen(app);
-
-// io.sockets.on('connection', (socket) => {
-
-//     // convenience function to log server messages to the client
-//     function log() {
-//         const array = ['>>> Message from server: '];
-//         for (const i = 0; i < arguments.length; i++) {
-//             array.push(arguments[i]);
-//         }
-//         socket.emit('log', array);
-//     }
-
-//     socket.on('message', (message) => {
-//         log('Got message:', message);
-//         // for a real app, would be room only (not broadcast)
-//         socket.broadcast.emit('message', message);
-//     });
-
-//     socket.on('create or join', (room) => {
-//         const numClients = io.sockets.clients(room).length;
-
-//         log('Room ' + room + ' has ' + numClients + ' client(s)');
-//         log('Request to create or join room ' + room);
-
-//         if (numClients === 0) {
-//             socket.join(room);
-//             socket.emit('created', room);
-//         } else if (numClients === 1) {
-//             io.sockets.in(room).emit('join', room);
-//             socket.join(room);
-//             socket.emit('joined', room);
-//         } else { // max two clients
-//             socket.emit('full', room);
-//         }
-//         socket.emit('emit(): client ' + socket.id +
-//             ' joined room ' + room);
-//         socket.broadcast.emit('broadcast(): client ' + socket.id +
-//             ' joined room ' + room);
-
-//     });
-
-// });
-
-
 const app = require('express')();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
@@ -60,19 +8,19 @@ let logged_connections = { count: 0 };
 
 io.on('connection', function (socket) {
 
-    console.log("Peer connected " + socket.id);
+    // console.log("Peer connected " + socket.id);
 
     socket.on('message', function (message) {
-        console.log("Message sent by: " + socket.id);
+        // console.log("Message sent by: " + socket.id);
         let data;
+
         //accepting only JSON messages 
         try {
-            console.log(message);
             data = JSON.parse(message);
 
         } catch (e) {
-            console.log("Invalid JSON by: " + socket.id);
-            socket.emit('message', { type: "joinRoom", success: false, msg: "Invalid JSON" });
+            console.log("Invalid JSON by: " + data.msg.user_id);
+            socket.emit('message', { type: "joinRoom", status: "error", msg: "Invalid JSON" });
             data = { type: "" };
         }
 
@@ -83,28 +31,63 @@ io.on('connection', function (socket) {
             case "leaveRoom":
                 onleaveRoom(socket, data);
                 break;
+            case "offer":
+                onoffer(socket, data);
+                break;
+            case "answer":
+                onanswer(socket, data);
+                break;
             default:
                 console.log("Invlalid message type by: " + data.msg.user_id);
-                socket.emit('message', { type: "joinRoom", success: false, msg: "Message type not found" });
+                socket.emit('message', { type: "error", status: "error", msg: "Message type not found" });
 
         }
-        console.log(logged_connections.count);
 
     });
 
     function onjoinRoom(socket, data) {
         console.log("joinRoom request sent by: " + data.msg.user_id);
-        if (logged_connections[data.msg.user_id]) {
-            socket.emit('message', { type: "joinRoom", success: false, msg: "User already logged in" });
-        } else {
-            logged_connections[data.msg.user_id] = socket;
-            logged_connections.count++;
-            socket.emit('message', { type: "joinRoom", success: true, msg: "" });
-        }
+
+        logged_connections[data.msg.user_id] = socket;
+        socket.name = data.msg.user_id;
+        logged_connections.count++;
+
+        socket.emit('message', { type: "joinRoom", status: "connected", msg: "User successfully joined" });
+
     }
 
     function onleaveRoom(socket, data) {
         console.log("leaveRoom request sent by: " + data.msg.user_id);
+        if (logged_connections[data.msg.user_id] != null) {
+            delete logged_connections[data.msg.user_id];
+            logged_connections.count--;
+        }
+        socket.emit('message', { type: "leaveRoom", status: "disconnected", msg: "User successfully leaved" });
+        if (logged_connections[socket.otherName] != null)
+            logged_connections[socket.otherName].emit('message', JSON.stringify({ type: "leaveRoom", msg: { user_id: socket.otherName } }));
+    }
+
+    function onoffer(socket, data) {
+
+        let conn = logged_connections[data.offer.userid];
+
+        if (conn != null) {
+            console.log("Sending offer to: " + data.offer.userid);
+            socket.otherName = data.offer.userid;
+            console.log("socket " + socket.id);
+            console.log("conn " + conn.id);
+            conn.emit('message', { type: "offer", offer: data.offer, msg: { user_id: data.offer.userid } });
+        }
+    }
+
+    function onanswer(socket, data) {
+
+        let conn = logged_connections[data.answer.userid];
+        if (conn != null) {
+            console.log("Sending answer to: " + data.answer.userid);
+            socket.otherName = data.answer.userid;
+            conn.emit('message', { type: "answer", answer: data.answer, msg: { user_id: data.answer.userid } });
+        }
     }
 
 });
