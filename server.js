@@ -37,6 +37,9 @@ io.on('connection', function (socket) {
             case "answer":
                 onanswer(socket, data);
                 break;
+            case "icecandidate":
+                onicecandidate(socket, data);
+                break;
             default:
                 console.log("Invlalid message type by: " + data.msg.user_id);
                 socket.emit('message', { type: "error", status: "error", msg: "Message type not found" });
@@ -74,8 +77,6 @@ io.on('connection', function (socket) {
         if (conn != null) {
             console.log("Sending offer to: " + data.offer.userid);
             socket.otherName = data.offer.userid;
-            console.log("socket " + socket.id);
-            console.log("conn " + conn.id);
             conn.emit('message', { type: "offer", offer: data.offer, msg: { user_id: data.offer.userid } });
         }
     }
@@ -87,6 +88,14 @@ io.on('connection', function (socket) {
             console.log("Sending answer to: " + data.answer.userid);
             socket.otherName = data.answer.userid;
             conn.emit('message', { type: "answer", answer: data.answer, msg: { user_id: data.answer.userid } });
+        }
+    }
+    function onicecandidate(socket, data) {
+
+        let conn = logged_connections[socket.otherName];
+        if (conn != null) {
+            console.log("Sending candidates to: " + socket.otherName);
+            conn.emit('message', { type: "icecandidate", candidate: data.candidate });
         }
     }
 
