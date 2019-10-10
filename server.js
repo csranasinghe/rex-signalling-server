@@ -2,7 +2,7 @@ const app = require('express')();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
-server.listen(8080);
+server.listen(process.env.PORT || 8888);
 
 let logged_connections = { count: 0 };
 
