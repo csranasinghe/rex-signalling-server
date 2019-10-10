@@ -6,6 +6,10 @@ server.listen(8888);
 
 let logged_connections = { count: 0 };
 
+app.get('/', function (req, res) {
+    res.send('<h1 style="text-align: center;">Rex-Signalling-Server is running on port 8888.</h1>');
+});
+
 io.on('connection', function (socket) {
 
     // console.log("Peer connected " + socket.id);
