@@ -1,36 +1,40 @@
-const app = require('express')();
-const server = require('http').Server(app);
-const io = require('socket.io')(server);
+const app = require("express")();
+const cors = require("cors");
+
+app.use(cors());
+
+const server = require("http").Server(app);
+const io = require("socket.io")(server);
 
 server.listen(process.env.PORT || 8888);
+let number_of_connections = 0;
+let joined_connections = new Map();
 
-let logged_connections = { count: 0 };
-
-app.get('/', function (req, res) {
-    res.send('<h1 style="text-align: center;">Rex-Signalling-Server is running on port 8888.</h1>');
+app.get("/", function (req, res) {
+    res.send(
+        '<h1 style="text-align: center;">Rex-Signalling-Server is running on port 8888.</h1>'
+    );
 });
 
-io.on('connection', function (socket) {
+io.on("connection", function (socket) {
+    console.log("Peer connected " + socket.id);
 
-    // console.log("Peer connected " + socket.id);
-
-    socket.on('message', function (message) {
+    socket.on("message", function (message) {
         // console.log("Message sent by: " + socket.id);
         let data;
 
-        //accepting only JSON messages 
+        //accepting only JSON messages
         try {
             data = JSON.parse(message);
-
         } catch (e) {
-            console.log("Invalid JSON by: " + data.msg.user_id);
-            socket.emit('message', { type: "joinRoom", status: "error", msg: "Invalid JSON" });
+            console.log("Invalid JSON by: " + socket.id);
+            onError(socket, message, "Invalid JSON");
             data = { type: "" };
         }
 
         switch (data.type) {
-            case "joinRoom":
-                onjoinRoom(socket, data);
+            case "join":
+                onJoin(socket, data);
                 break;
             case "offer":
                 onoffer(socket, data);
@@ -41,26 +45,69 @@ io.on('connection', function (socket) {
             case "icecandidate":
                 onicecandidate(socket, data);
                 break;
-            case "leaveRoom":
+            case "leave":
                 onleaveRoom(socket, data);
                 break;
             default:
-                console.log("Invlalid message type by: " + data.msg.user_id);
-                socket.emit('message', { type: "error", status: "error", msg: "Message type not found" });
-
+                console.log("Invlalid message type by: " + socket.id);
+                onError(socket, data, "Message type not found");
         }
-
     });
 
-    function onjoinRoom(socket, data) {
-        console.log("joinRoom request sent by: " + data.msg.user_id);
+    function onError(socket, data, cause) {
+        socket.emit("message", {
+            type: "error",
+            data: { msg: cause, error: data },
+        });
+    }
 
-        logged_connections[data.msg.user_id] = socket;
-        socket.name = data.msg.user_id;
-        logged_connections.count++;
+    function onJoin(socket, data) {
+        console.log("joinRoom request sent by: " + socket.id);
 
-        socket.emit('message', { type: "joinRoom", status: "connected", msg: "User successfully joined" });
+        number_of_connections++;
 
+        let connected_peer_list = [];
+
+        let peerObj = {
+            id: socket.id,
+            name: data.peer.name,
+        };
+        // Notify others about the new peer join
+        logged_connections.forEach((id, data) => {
+            data.conn.emit("message", {
+                type: "peer-joined",
+                data: {
+                    msg: "new peer joined",
+                    peer: peerObj,
+                },
+            });
+        });
+
+        // Notify the success
+        socket.emit("message", {
+            type: "peer-joined-success",
+            data: {
+                msg: "joined",
+                peer: peerObj,
+            },
+        });
+
+        // Send list of connected peers
+        logged_connections.forEach((id, data) => {
+            connected_peer_list.push(data.peer);
+        });
+
+        socket.emit("message", {
+            type: "peer-list",
+            data: {
+                msg: "connecte4d peer list",
+                peerList: connected_peer_list,
+            },
+        });
+        logged_connections.set(socket.id, {
+            peer: peerObj,
+            conn: socket,
+        });
     }
 
     function onoffer(socket, data) {
@@ -68,7 +115,11 @@ io.on('connection', function (socket) {
         if (conn != null) {
             console.log("Sending offer to: " + data.offer.userid);
             socket.otherName = data.offer.userid;
-            conn.emit('message', { type: "offer", offer: data.offer, msg: { user_id: data.offer.userid } });
+            conn.emit("message", {
+                type: "offer",
+                offer: data.offer,
+                msg: { user_id: data.offer.userid },
+            });
         }
     }
 
@@ -77,7 +128,11 @@ io.on('connection', function (socket) {
         if (conn != null) {
             console.log("Sending answer to: " + data.answer.userid);
             socket.otherName = data.answer.userid;
-            conn.emit('message', { type: "answer", answer: data.answer, msg: { user_id: data.answer.userid } });
+            conn.emit("message", {
+                type: "answer",
+                answer: data.answer,
+                msg: { user_id: data.answer.userid },
+            });
         }
     }
 
@@ -85,7 +140,10 @@ io.on('connection', function (socket) {
         let conn = logged_connections[socket.otherName];
         if (conn != null) {
             console.log("Sending candidates to: " + socket.otherName);
-            conn.emit('message', { type: "icecandidate", candidate: data.candidate });
+            conn.emit("message", {
+                type: "icecandidate",
+                candidate: data.candidate,
+            });
         }
     }
 
@@ -95,10 +153,16 @@ io.on('connection', function (socket) {
             delete logged_connections[data.msg.user_id];
             logged_connections.count--;
         }
-        socket.emit('message', { type: "leaveRoom", status: "disconnected", msg: "User successfully leaved" });
+        socket.emit("message", {
+            type: "leaveRoom",
+            status: "disconnected",
+            msg: "User successfully leaved",
+        });
         if (logged_connections[socket.otherName] != null)
-            logged_connections[socket.otherName].emit('message', { type: "leaveRoom", status: "disconnected", msg: { user_id: socket.otherName } });
+            logged_connections[socket.otherName].emit("message", {
+                type: "peer-left",
+                status: "disconnected",
+                msg: { user_id: socket.otherName },
+            });
     }
-
 });
-
