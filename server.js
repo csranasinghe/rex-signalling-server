@@ -26,6 +26,7 @@ io.on("connection", function (socket) {
         //accepting only JSON messages
         try {
             data = JSON.parse(message);
+            data = data.data;
         } catch (e) {
             console.log("Invalid JSON by: " + socket.id);
             onError(socket, message, "Invalid JSON");
