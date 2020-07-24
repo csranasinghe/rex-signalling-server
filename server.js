@@ -26,7 +26,6 @@ io.on("connection", function (socket) {
         //accepting only JSON messages
         try {
             data = JSON.parse(message);
-            data = data.data;
         } catch (e) {
             console.log("Invalid JSON by: " + socket.id);
             onError(socket, message, "Invalid JSON");
@@ -35,19 +34,19 @@ io.on("connection", function (socket) {
 
         switch (data.type) {
             case "join":
-                onJoin(socket, data);
+                onJoin(socket, data.data);
                 break;
             case "offer":
-                onoffer(socket, data);
+                onoffer(socket, data.data);
                 break;
             case "answer":
-                onanswer(socket, data);
+                onanswer(socket, data.data);
                 break;
             case "icecandidate":
-                onicecandidate(socket, data);
+                onicecandidate(socket, data.data);
                 break;
             case "leave":
-                onleaveRoom(socket, data);
+                onleaveRoom(socket, data.data);
                 break;
             default:
                 console.log("Invlalid message type by: " + socket.id);
