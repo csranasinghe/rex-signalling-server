@@ -70,7 +70,7 @@ io.on("connection", function (socket) {
     }
 
     function onJoin(socket, data) {
-        console.log("joinRoom request sent by: " + socket.id);
+        console.log("join request sent by: " + socket.id);
 
         number_of_connections++;
 
@@ -81,7 +81,7 @@ io.on("connection", function (socket) {
             name: data.peer.name,
         };
         // Notify others about the new peer join
-        logged_connections.forEach((id, data) => {
+        logged_connections.forEach((data, id, map) => {
             data.conn.emit("message", {
                 type: "peer-joined",
                 data: {
@@ -101,7 +101,7 @@ io.on("connection", function (socket) {
         });
 
         // Send list of connected peers
-        logged_connections.forEach((id, data) => {
+        logged_connections.forEach((data, id, map) => {
             connected_peer_list.push(data.peer);
         });
 
