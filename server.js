@@ -9,7 +9,7 @@ const io = require("socket.io")(server);
 server.listen(process.env.PORT || 5500);
 let number_of_connections = 0;
 let logged_connections = new Map();
-
+let peerObj = { id: "", name: "" };
 app.get("/", function (req, res) {
     res.send(
         '<h1 style="text-align: center;">Rex-Signalling-Server is running on port 8888.</h1>'
@@ -76,7 +76,7 @@ io.on("connection", function (socket) {
 
         let connected_peer_list = [];
 
-        let peerObj = {
+        peerObj = {
             id: socket.id,
             name: data.peer.name,
         };
@@ -119,14 +119,15 @@ io.on("connection", function (socket) {
     }
 
     function onoffer(socket, data) {
-        let conn = logged_connections[data.offer.userid];
+        let conn = logged_connections[data.destinationId];
         if (conn != null) {
-            console.log("Sending offer to: " + data.offer.userid);
-            socket.otherName = data.offer.userid;
+            console.log("Sending offer to: " + data.destinationId);
             conn.emit("message", {
                 type: "offer",
-                offer: data.offer,
-                msg: { user_id: data.offer.userid },
+                data: {
+                    offer: data.offer,
+                    callee: peerObj.name,
+                },
             });
         }
     }
