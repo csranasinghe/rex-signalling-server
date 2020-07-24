@@ -6,9 +6,9 @@ app.use(cors());
 const server = require("http").Server(app);
 const io = require("socket.io")(server);
 
-server.listen(process.env.PORT || 8888);
+server.listen(process.env.PORT || 5500);
 let number_of_connections = 0;
-let joined_connections = new Map();
+let logged_connections = new Map();
 
 app.get("/", function (req, res) {
     res.send(
@@ -52,6 +52,14 @@ io.on("connection", function (socket) {
                 console.log("Invlalid message type by: " + socket.id);
                 onError(socket, data, "Message type not found");
         }
+    });
+
+    socket.on("disconnect", (reason) => {
+        console.log(reason);
+        number_of_connections--;
+        if (logged_connections.has(socket.id))
+            logged_connections.delete(socket.id);
+        console.log("Connection deleted: " + socket.id);
     });
 
     function onError(socket, data, cause) {
@@ -100,7 +108,7 @@ io.on("connection", function (socket) {
         socket.emit("message", {
             type: "peer-list",
             data: {
-                msg: "connecte4d peer list",
+                msg: "connected peer list",
                 peerList: connected_peer_list,
             },
         });
