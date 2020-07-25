@@ -119,29 +119,38 @@ io.on("connection", function (socket) {
     }
 
     function onoffer(socket, data) {
-        let conn = logged_connections[data.destinationId];
-        if (conn != null) {
+        if (logged_connections.has(data.destinationId)) {
+            let connObj = logged_connections.get(data.destinationId);
             console.log("Sending offer to: " + data.destinationId);
-            conn.emit("message", {
+            connObj.conn.emit("message", {
                 type: "offer",
                 data: {
                     offer: data.offer,
-                    callee: peerObj.name,
+                    callee: connObj.peer,
+                    caller: peerObj,
                 },
             });
+        } else {
+            console.log(logged_connections);
+            console.log("Connection not found:" + data.destinationId);
         }
     }
 
     function onanswer(socket, data) {
-        let conn = logged_connections[data.answer.userid];
-        if (conn != null) {
+        if (logged_connections.has(data.destinationId)) {
             console.log("Sending answer to: " + data.answer.userid);
             socket.otherName = data.answer.userid;
             conn.emit("message", {
                 type: "answer",
-                answer: data.answer,
-                msg: { user_id: data.answer.userid },
+                data: {
+                    answer: data.answer,
+                    caller: connObj.peer,
+                    callee: peerObj,
+                },
             });
+        } else {
+            console.log(logged_connections);
+            console.log("Connection not found:" + data.destinationId);
         }
     }
 
@@ -159,7 +168,7 @@ io.on("connection", function (socket) {
     function onleaveRoom(socket, data) {
         console.log("leaveRoom request sent by: " + data.msg.user_id);
         if (logged_connections[data.msg.user_id] != null) {
-            delete logged_connections[data.msg.user_id];
+            delete logged_connections.delte[data.msg.user_id];
             logged_connections.count--;
         }
         socket.emit("message", {
