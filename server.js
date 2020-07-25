@@ -138,9 +138,10 @@ io.on("connection", function (socket) {
 
     function onanswer(socket, data) {
         if (logged_connections.has(data.destinationId)) {
+            let connObj = logged_connections.get(data.destinationId);
             console.log("Sending answer to: " + data.answer.userid);
-            socket.otherName = data.answer.userid;
-            conn.emit("message", {
+
+            connObj.conn.emit("message", {
                 type: "answer",
                 data: {
                     answer: data.answer,
