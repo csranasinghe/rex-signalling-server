@@ -9,7 +9,7 @@ const io = require("socket.io")(server);
 server.listen(process.env.PORT || 5500);
 let number_of_connections = 0;
 let logged_connections = new Map();
-let peerObj = { id: "", name: "" };
+
 app.get("/", function (req, res) {
     res.send(
         '<h1 style="text-align: center;">Rex-Signalling-Server is running on port 8888.</h1>'
@@ -18,7 +18,7 @@ app.get("/", function (req, res) {
 
 io.on("connection", function (socket) {
     console.log("Peer connected " + socket.id);
-
+    let peerObj = { id: "", name: "" };
     socket.on("message", function (message) {
         // console.log("Message sent by: " + socket.id);
         let data;
@@ -139,14 +139,13 @@ io.on("connection", function (socket) {
     function onanswer(socket, data) {
         if (logged_connections.has(data.destinationId)) {
             let connObj = logged_connections.get(data.destinationId);
-            console.log("Sending answer to: " + data.answer.userid);
-
+            console.log("Sending answer to: " + data.destinationId);
             connObj.conn.emit("message", {
                 type: "answer",
                 data: {
                     answer: data.answer,
-                    caller: connObj.peer,
                     callee: peerObj,
+                    caller: connObj.peer,
                 },
             });
         } else {
@@ -156,13 +155,18 @@ io.on("connection", function (socket) {
     }
 
     function onicecandidate(socket, data) {
-        let conn = logged_connections[socket.otherName];
-        if (conn != null) {
-            console.log("Sending candidates to: " + socket.otherName);
-            conn.emit("message", {
+        if (logged_connections.has(data.destinationId)) {
+            let connObj = logged_connections.get(data.destinationId);
+            console.log("Sending icecandidate to: " + data.destinationId);
+            connObj.conn.emit("message", {
                 type: "icecandidate",
-                candidate: data.candidate,
+                data: {
+                    ice: data.ice,
+                },
             });
+        } else {
+            console.log(logged_connections);
+            console.log("Connection not found:" + data.destinationId);
         }
     }
 
