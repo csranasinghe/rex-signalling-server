@@ -42,11 +42,14 @@ io.on("connection", function (socket) {
             case "answer":
                 onanswer(socket, data.data);
                 break;
+            case "hangup":
+                onhangup(socket, data.data);
+                break;
             case "icecandidate":
                 onicecandidate(socket, data.data);
                 break;
             case "leave":
-                onleaveRoom(socket, data.data);
+                onleave(socket, data.data);
                 break;
             default:
                 console.log("Invlalid message type by: " + socket.id);
@@ -56,10 +59,9 @@ io.on("connection", function (socket) {
 
     socket.on("disconnect", (reason) => {
         console.log(reason);
-        number_of_connections--;
-        if (logged_connections.has(socket.id))
-            logged_connections.delete(socket.id);
-        console.log("Connection deleted: " + socket.id);
+
+        console.log("Connection disconneccted: " + socket.id);
+        onleave(socket, {});
     });
 
     function onError(socket, data, cause) {
@@ -131,7 +133,6 @@ io.on("connection", function (socket) {
                 },
             });
         } else {
-            console.log(logged_connections);
             console.log("Connection not found:" + data.destinationId);
         }
     }
@@ -149,7 +150,6 @@ io.on("connection", function (socket) {
                 },
             });
         } else {
-            console.log(logged_connections);
             console.log("Connection not found:" + data.destinationId);
         }
     }
@@ -165,27 +165,45 @@ io.on("connection", function (socket) {
                 },
             });
         } else {
-            console.log(logged_connections);
             console.log("Connection not found:" + data.destinationId);
         }
     }
 
-    function onleaveRoom(socket, data) {
-        console.log("leaveRoom request sent by: " + data.msg.user_id);
-        if (logged_connections[data.msg.user_id] != null) {
-            delete logged_connections.delte[data.msg.user_id];
-            logged_connections.count--;
-        }
-        socket.emit("message", {
-            type: "leaveRoom",
-            status: "disconnected",
-            msg: "User successfully leaved",
-        });
-        if (logged_connections[socket.otherName] != null)
-            logged_connections[socket.otherName].emit("message", {
-                type: "peer-left",
-                status: "disconnected",
-                msg: { user_id: socket.otherName },
+    function onhangup(socket, data) {
+        console.log("hangup request sent by: " + socket.id);
+        if (logged_connections.has(data.destinationId)) {
+            let connObj = logged_connections.get(data.destinationId);
+            connObj.conn.emit("message", {
+                type: "hangup",
+                data: {
+                    leftPeer: peerObj,
+                },
             });
+        } else {
+            console.log("Connection not found:" + data.destinationId);
+        }
+    }
+
+    function onleave(socket, data) {
+        console.log("leave request sent by: " + socket.id);
+
+        if (logged_connections.has(socket.id)) {
+            logged_connections.delete[socket.id];
+            logged_connections.count--;
+
+            // Notify others about the peer leave
+            logged_connections.forEach((data, id, map) => {
+                data.conn.emit("message", {
+                    type: "peer-left",
+                    data: {
+                        msg: "peer left",
+                        peer: peerObj,
+                    },
+                });
+            });
+        } else {
+            console.log(logged_connections);
+            console.log("Connection not found:" + data.destinationId);
+        }
     }
 });
